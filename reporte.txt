@@ -1,0 +1,31 @@
+=== REPORTE DE AUDITORÍA DE CABECERAS HTTP ===
+
+[+] Analizando postura de seguridad para: https://google.com
+  [!] ALERTA: Falta 'Strict-Transport-Security'
+      -> Impacto: Fuerza el uso de HTTPS (Protege contra ataques de interceptación)
+  [!] ALERTA: Falta 'Content-Security-Policy'
+      -> Impacto: Controla qué recursos se pueden cargar (Previene XSS)
+  [OK] X-Frame-Options -> Configurada correctamente.
+  [!] ALERTA: Falta 'X-Content-Type-Options'
+      -> Impacto: Evita que el navegador interprete archivos maliciosos
+  -> Resumen: 1 de 4 cabeceras implementadas.
+
+
+[+] Analizando postura de seguridad para: https://example.com
+  [!] ALERTA: Falta 'Strict-Transport-Security'
+      -> Impacto: Fuerza el uso de HTTPS (Protege contra ataques de interceptación)
+  [!] ALERTA: Falta 'Content-Security-Policy'
+      -> Impacto: Controla qué recursos se pueden cargar (Previene XSS)
+  [!] ALERTA: Falta 'X-Frame-Options'
+      -> Impacto: Evita que la web sea clonada dentro de un iframe (Clickjacking)
+  [!] ALERTA: Falta 'X-Content-Type-Options'
+      -> Impacto: Evita que el navegador interprete archivos maliciosos
+  -> Resumen: 0 de 4 cabeceras implementadas.
+
+
+[+] Analizando postura de seguridad para: https://github.com
+  [OK] Strict-Transport-Security -> Configurada correctamente.
+  [OK] Content-Security-Policy -> Configurada correctamente.
+  [OK] X-Frame-Options -> Configurada correctamente.
+  [OK] X-Content-Type-Options -> Configurada correctamente.
+  -> Resumen: 4 de 4 cabeceras implementadas.
