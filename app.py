@@ -3,12 +3,12 @@ import time
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import httpx
 
 app = FastAPI(title="WebGuard MX Security Engine")
 
-# Permite peticiones CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -134,12 +134,20 @@ async def scan_headers(url: str = Query(...)):
         vulnerabilities=findings
     )
 
-# --- Servir Frontend (React/Vite) ---
-dist_path = os.path.join(os.path.dirname(__file__), "frontend", "dist")
+# --- Servir Frontend ---
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+DIST_DIR = os.path.join(BASE_DIR, "frontend", "dist")
 
-if os.path.exists(dist_path):
-    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
+if os.path.exists(DIST_DIR):
+    app.mount("/assets", StaticFiles(directory=os.path.join(DIST_DIR, "assets")), name="assets")
+
+    @app.get("/{full_path:path}")
+    async def serve_react(full_path: str):
+        file_path = os.path.join(DIST_DIR, full_path)
+        if os.path.exists(file_path) and os.path.isfile(file_path):
+            return FileResponse(file_path)
+        return FileResponse(os.path.join(DIST_DIR, "index.html"))
 else:
     @app.get("/")
     def index():
-        return {"message": "Carpeta frontend/dist no encontrada."}
+        return {"error": "Carpeta frontend/dist no encontrada en el servidor."}
