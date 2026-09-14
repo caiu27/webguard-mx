@@ -1,14 +1,14 @@
+import os
 import time
-from pathlib import Path
 from fastapi import FastAPI, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import FileResponse
 from pydantic import BaseModel
 import httpx
 
 app = FastAPI(title="WebGuard MX Security Engine")
 
+# Permite peticiones CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -19,7 +19,7 @@ app.add_middleware(
 
 class VulnDetail(BaseModel):
     header: str
-    status: str  # "critical", "warning", "pass"
+    status: str
     message: str
     fix: str
 
@@ -30,6 +30,11 @@ class AuditResponse(BaseModel):
     server_info: str
     response_time_ms: int
     vulnerabilities: list[VulnDetail]
+
+# --- Rutas de API ---
+@app.get("/api/health")
+def health_check():
+    return {"status": "ok"}
 
 @app.get("/scan", response_model=AuditResponse)
 async def scan_headers(url: str = Query(...)):
@@ -52,7 +57,6 @@ async def scan_headers(url: str = Query(...)):
             elapsed_time = int((time.time() - start_time) * 1000)
             headers = {k.lower(): v for k, v in response.headers.items()}
 
-            # 1. Server Leak Detection
             if "server" in headers:
                 server_header = headers["server"]
                 score -= 10
@@ -63,7 +67,6 @@ async def scan_headers(url: str = Query(...)):
                     fix="Desactivar ServerTokens en Apache/Nginx"
                 ))
 
-            # 2. X-Frame-Options (Clickjacking)
             if "x-frame-options" not in headers:
                 score -= 20
                 findings.append(VulnDetail(
@@ -73,7 +76,6 @@ async def scan_headers(url: str = Query(...)):
                     fix="X-Frame-Options: DENY"
                 ))
 
-            # 3. Content-Security-Policy (XSS)
             if "content-security-policy" not in headers:
                 score -= 20
                 findings.append(VulnDetail(
@@ -83,7 +85,6 @@ async def scan_headers(url: str = Query(...)):
                     fix="Content-Security-Policy: default-src 'self';"
                 ))
 
-            # 4. Strict-Transport-Security (HSTS)
             if "strict-transport-security" not in headers:
                 score -= 15
                 findings.append(VulnDetail(
@@ -93,7 +94,6 @@ async def scan_headers(url: str = Query(...)):
                     fix="Strict-Transport-Security: max-age=31536000; includeSubDomains"
                 ))
 
-            # 5. Referrer-Policy
             if "referrer-policy" not in headers:
                 score -= 10
                 findings.append(VulnDetail(
@@ -103,7 +103,6 @@ async def scan_headers(url: str = Query(...)):
                     fix="Referrer-Policy: strict-origin-when-cross-origin"
                 ))
 
-            # 6. Cookies inseguras (Set-Cookie)
             set_cookie = response.headers.get("set-cookie", "").lower()
             if set_cookie:
                 missing_flags = []
@@ -119,7 +118,7 @@ async def scan_headers(url: str = Query(...)):
                     findings.append(VulnDetail(
                         header="Galletas / Cookies Inseguras",
                         status="critical",
-                        message=f"Las cookies emitidas carecen de los atributos de seguridad: {', '.join(missing_flags)}.",
+                        message=f"Las cookies emitidas carecen de atributos de seguridad: {', '.join(missing_flags)}.",
                         fix="Set-Cookie: clave=valor; Secure; HttpOnly; SameSite=Strict"
                     ))
 
@@ -135,18 +134,12 @@ async def scan_headers(url: str = Query(...)):
         vulnerabilities=findings
     )
 
-# Estáticos de React
-BASE_DIR = Path(__file__).resolve().parent
-frontend_dist = BASE_DIR / "frontend" / "dist"
+# --- Servir Frontend (React/Vite) ---
+dist_path = os.path.join(os.path.dirname(__file__), "frontend", "dist")
 
-if frontend_dist.exists():
-    app.mount("/assets", StaticFiles(directory=str(frontend_dist / "assets")), name="assets")
-
-    @app.get("/{full_path:path}")
-    def serve_react_app(full_path: str):
-        if full_path.startswith("api/") or full_path == "scan":
-            raise HTTPException(status_code=404, detail="Not Found")
-        file_path = frontend_dist / full_path
-        if file_path.is_file():
-            return FileResponse(str(file_path))
-        return FileResponse(str(frontend_dist / "index.html"))
+if os.path.exists(dist_path):
+    app.mount("/", StaticFiles(directory=dist_path, html=True), name="static")
+else:
+    @app.get("/")
+    def index():
+        return {"message": "Carpeta frontend/dist no encontrada."}
